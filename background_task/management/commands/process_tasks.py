@@ -7,10 +7,12 @@ import time
 from django import VERSION
 from django.core.management.base import BaseCommand
 from django.utils import autoreload
+from django.db.models import Q
 
 from background_task.tasks import tasks, autodiscover
 from background_task.utils import SignalManager
 from compat import close_connection
+from background_task.models import Task
 
 
 logger = logging.getLogger(__name__)
@@ -96,6 +98,9 @@ class Command(BaseCommand):
         autodiscover()
 
         start_time = time.time()
+
+        # unlock the locked tasks before starting
+        Task.objects.filter(Q(locked_at__isnull=False) | Q(locked_by__isnull=False)).update(locked_at=None, locked_by=None)
 
         while (duration <= 0) or (time.time() - start_time) <= duration:
             if sig_manager.kill_now:
